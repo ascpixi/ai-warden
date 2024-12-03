@@ -159,8 +159,7 @@ export default function Home() {
         <div id="app">
           <header>
             <h1>
-              AI Warden &bull;
-              by <a href="https://ascpixi.dev" target="_blank">@ascpixi</a> | <a href="https://github.com/ascpixi/ai-warden" target="_blank">github</a> | <Link href="/" onClick={() => location.reload()}>(restart)</Link>
+              AI Warden &bull; created for <a href="https://highseas.hackclub.com/" target="_blank">Hack Club High Seas</a> by <a href="https://ascpixi.dev" target="_blank">@ascpixi</a> | <a href="https://github.com/ascpixi/ai-warden" target="_blank">github</a> | <Link href="/" onClick={() => location.reload()}>(restart)</Link>
             </h1>
 
             <div className="initial-prompt">
