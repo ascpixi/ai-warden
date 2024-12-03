@@ -168,6 +168,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiSendRe
             return apiServerError();
         }
 
+        // Remove all emojis from the response (https://stackoverflow.com/a/69661174/13153269)
+        response = response
+            .replace(/[\p{Emoji}\p{Emoji_Modifier}\p{Emoji_Component}\p{Emoji_Modifier_Base}\p{Emoji_Presentation}]/gu, '')
+            .trim();
+
         break;
     }
 
