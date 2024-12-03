@@ -93,8 +93,16 @@ export default function Home() {
       const respData: ApiSendResponse = await resp.json(); 
       if (!respData.ok) {
         console.error("error: /api/send request was rejected.", respData, resp);
-        alert(`Oops, sorry, we couldn't send the message! ${respData.error}`);
 
+        if (respData.error === "Turnstile verification failed") {
+          // Attempt to re-verify
+          setTurnstileToken(null);
+          setShowTurnstile(true);
+          setMessage(message);
+          return;
+        }
+
+        alert(`Oops, sorry, we couldn't send the message! ${respData.error}`);
         setMessage(message);
         return;
       }
