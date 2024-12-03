@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   description: "Try to convince an AI warden to let you out of your prison!",
 };
 
-export const font = VT323({
+const font = VT323({
   subsets: ["latin"],
   weight: "400",
   variable: "--vt323"
