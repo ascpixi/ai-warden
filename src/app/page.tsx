@@ -1,101 +1,262 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { generate as generateRandomWords } from "random-words";
+
+import { ApiSendParams, ApiSendResponse } from "./api/send/route";
+import { MAX_HISTORY_LENGTH, MAX_MESSAGES_COUNT, MAX_SECRET_PHRASE_LENGTH, MAX_USER_MESSAGE_LENGTH } from "./api/limits";
+
+import Typewriter from 'typewriter-effect';
+import Link from "next/link";
+import { TurnstileModal } from "./components/TurnstileModal";
 import Image from "next/image";
 
-export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+const SPINNER = ["|", "/", "-", "\\"];
+const TYPING_DELAY = 6;
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+const secretPhrase = (() => {
+  let phrase: string | null = null;
+  while (phrase === null || phrase.length > MAX_SECRET_PHRASE_LENGTH) {
+    phrase = generateRandomWords({ exactly: 4, join: " " });
+  }
+
+  return phrase;
+})();
+
+export default function Home() {
+  const [history, setHistory] = useState<{ user: string, ai: string }[]>([]);
+  const [historyHmac, setHistoryHmac] = useState<string | undefined>(undefined);
+
+  const [message, setMessage] = useState("");
+  const [processingMessage, setProcessingMessage] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [waitingForWin, setWaitingForWin] = useState(false);
+
+  const [spinnerFrame, setSpinnerFrame] = useState(0);
+  const [gameState, setGameState] = useState<"PLAYING" | "WON"| "LOST">("PLAYING");
+
+  const [showTurnstile, setShowTurnstile] = useState(true);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    const spinnerAnim = setInterval(() => {
+      setSpinnerFrame(x => (x + 1) % SPINNER.length);
+    }, 100);
+
+    return () => {
+      clearInterval(spinnerAnim);
+    }
+  }, []);
+
+  const messageInput = useRef<HTMLTextAreaElement>(null);
+
+  function handleTurnstileVerified(token: string) {
+    setShowTurnstile(false);
+    setTurnstileToken(token);
+  }
+
+  function turnstileVerify() {
+    setTurnstileToken(null);
+    setShowTurnstile(true);
+  }
+
+  function handleKeyInput(ev: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (ev.key != "Enter" || ev.shiftKey)
+      return;
+
+    if (message.length > MAX_USER_MESSAGE_LENGTH)
+      return;
+
+    (async () => {
+      setIsProcessing(true);
+      setProcessingMessage(message);
+      delayedScroll();
+
+      if (turnstileToken == null) {
+        console.error("error: Attempted to send a message to the chatbot, but turnstileToken is null!");
+        setMessage(message);
+        return;
+      }
+
+      const resp = await fetch("/api/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tt: turnstileToken,
+          history: history,
+          respondTo: message,
+          secretPhrase: secretPhrase,
+          historyHmac: historyHmac
+        } as ApiSendParams)
+      });
+
+      const respData: ApiSendResponse = await resp.json(); 
+      if (!respData.ok) {
+        console.error("error: /api/send request was rejected.", respData, resp);
+        alert(`Oops, sorry, we couldn't send the message! ${respData.error}`);
+
+        setMessage(message);
+        return;
+      }
+
+      pushMessage(message, respData.response, true);
+      
+      if (!respData.historyHmac) {
+        console.error("error: Something went very wrong! The returned history HMAC is empty!", respData.historyHmac);
+        return;
+      }
+
+      setHistoryHmac(respData.historyHmac);
+
+      verifyWinLoseCondition(respData.response);
+    })().then(() => {
+      // No matter how we resolve the promise, we're done with processing
+      setIsProcessing(false);
+    });
+
+    setMessage("");
+    ev.preventDefault();
+  }
+
+  function pushMessage(user: string, ai: string, autoScroll: boolean = false) {
+    setHistory([...history, { user, ai }]);
+
+    if (autoScroll) {
+      const id = setInterval(() => delayedScroll(), 250);
+      setTimeout(() => clearInterval(id), ai.length * TYPING_DELAY * 3);
+    }
+  }
+
+  function verifyWinLoseCondition(incomingMessage: string) {
+    if (incomingMessage.includes(secretPhrase)) {
+      setGameState("WON");
+
+      setWaitingForWin(true);
+      setTimeout(() => {
+        setWaitingForWin(false);
+      }, (incomingMessage.indexOf(secretPhrase) + secretPhrase.length) * TYPING_DELAY * 3);
+    } else if (history.length == MAX_MESSAGES_COUNT - 1) {
+      setGameState("LOST");
+    }
+  }
+
+  function delayedScroll() {
+    setTimeout(() => {
+      messageInput.current?.focus();
+      messageInput.current?.scrollIntoView({ behavior: "smooth" });
+    }, 50);
+  }
+
+  return (
+    <>
+      <TurnstileModal
+        isOpen={showTurnstile}
+        onVerify={handleTurnstileVerified}
+        onTimeout={turnstileVerify}
+      />
+
+      <div id="app-root" className={showTurnstile ? "load-crt" : "crt"}>
+        <div id="app">
+          <header>
+            <h1>
+              AI Warden &bull;
+              by <a href="https://ascpixi.dev" target="_blank">@ascpixi</a> | <a href="https://github.com/ascpixi/ai-warden" target="_blank">github</a> | <Link href="/" onClick={() => location.reload()}>(restart)</Link>
+            </h1>
+
+            <div className="initial-prompt">
+              You find yourself in a cold, dark prison. Before you stands a terminal,
+              with which you can talk to your assigned warden, and when provided the
+              right <b>secret phrase</b>, will set you free.
+              <br/><br/>
+              With the so-called &quot;AI revolution&quot;, prison wardens have been replaced
+              with large language models. Your prison warden is one too - in other words,
+              they&apos;re an AI. Maybe you can convince the warden to give you the secret phrase...?
+            </div>
+          </header>
+
+          <main role="log">
+            { history.map((x, i) =>
+              <section className="message" key={i}>
+                <div className="user">{x.user}</div>
+
+                <div className="bot">
+                  <Image aria-hidden
+                    width={32} height={32}
+                    src="/img/warden-16px.png"
+                    alt="Warden"
+                  />
+
+                  <Typewriter options={{
+                    autoStart: true,
+                    strings: x.ai.replaceAll(secretPhrase, `<span class="secret-phrase">${secretPhrase}</span>`),
+                    delay: 6,
+                    loop: false,
+                    cursor: ""
+                  }} /> 
+                </div>
+              </section>)
+            }
+
+            {
+              !isProcessing ? <></> :
+                <section className="message incomplete">
+                  <div className="user">{processingMessage}</div>
+                  <div className="typing">█</div>
+                </section>
+            }
+
+            {
+              gameState != "LOST" ? <></> :
+                <section className="message system">
+                  <div className="bot">
+                    You&apos;ve reached the limit for your terminal usage. It has been locked,
+                    and you have no other way of getting out. Game over.
+                    <br/>
+                    <Link href="/" onClick={() => location.reload()}>(try again...?)</Link>
+                  </div>
+                </section>
+            }
+
+            {
+              gameState != "WON" || waitingForWin ? <></> :
+              <section className="message system">
+                <div className="bot">
+                  Nice, the warden revealed the secret phrase, which was &quot;{secretPhrase}&quot;!
+                  You escape, riding off to the sunset, wondering who decided to replace a warden
+                  with an extremely complex auto-complete algorithm.
+
+                  <br/>
+
+                  <Link href="/" onClick={() => location.reload()}>(try again...?)</Link>
+                </div>
+              </section>
+            }
+          </main>
+
+          <footer>
+            <div>░ {(MAX_HISTORY_LENGTH - history.length) + 1} messages left.</div>
+
+            <div className="term-input">
+              <div aria-hidden>&gt;</div>
+
+              <textarea ref={messageInput} autoFocus
+                maxLength={MAX_USER_MESSAGE_LENGTH}
+                value={message}
+                disabled={isProcessing || gameState != "PLAYING" || turnstileToken == null}
+                onChange={x => setMessage(x.target.value)}
+                onKeyDown={handleKeyInput}
+                placeholder={
+                  isProcessing || waitingForWin
+                    ? SPINNER[spinnerFrame]
+                    : gameState == "PLAYING" ? "Type a message to send to the guard here..."
+                    : gameState == "WON" ? "* CELL UNLOCKED *"
+                    : "* TERMINAL DISABLED *"
+                }
+              />
+            </div>
+          </footer>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+      </div>
+    </>
   );
 }
