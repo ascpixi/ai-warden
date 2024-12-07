@@ -118,7 +118,7 @@ export default function Home() {
 
       while (trustToken.current == null) {
         await sleep(250);
-        console.log("Waiting for trust token authentication...");
+        console.log("info: waiting for trust token authentication...");
       }
 
       sndMessageSent();
@@ -141,8 +141,14 @@ export default function Home() {
 
         if (respData.error === "Invalid or expired trust token") {
           // Attempt to re-verify
+          console.warn("warn: we're gonna try to re-verify and try again.");
           turnstileVerify();
-          setMessage(message);
+
+          while (trustToken.current == null) {
+            await sleep(250);
+            console.log("info: waiting for trust token authentication...");
+          }
+
           return;
         }
 
