@@ -1,21 +1,29 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { sleep } from "./util";
 
 export function WithFilters({ children }: { children: React.ReactNode }) {
-  const [canApplyFilters, setCanApplyFilters] = useState(false);
+  const [shouldShift, setShouldShift] = useState(true);
 
   useEffect(() => {
-    setTimeout(() => {
-      setCanApplyFilters(true);
-    }, 150);
+    (async () => {
+      await sleep(150);
+      setShouldShift(false);
+      await sleep(100);
+      setShouldShift(true);
+      await sleep(100);
+      setShouldShift(false);
+    })();
   }, []);
 
-  return <>
-    <img aria-hidden className="hidden" src="/img/rgb_pattern.png" />
-    {canApplyFilters ? <CssFilters /> : <div className="filter-loading"/>}
+  return <div style={{
+    width: shouldShift ? "99.99%" : "100%",
+    height: "100%",
+  }}>
+    <CssFilters />
     {children}
-  </>
+  </div>
 }
 
 export const CssFilters = () => (
@@ -57,6 +65,7 @@ export const CssFilters = () => (
     </filter>
 
     <filter id="crt">
+      <feImage xlinkHref="/img/rgb_pattern.png" width="6" height="4" result="rgbPattern" />
       <feImage xlinkHref="/img/rgb_pattern.png" width="6" height="4" result="rgbPattern" />
       {/* <feImage xlinkHref="/img/crt_displacement.png" result="crtDisplacement" /> */}
 
