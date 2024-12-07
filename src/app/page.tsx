@@ -263,7 +263,7 @@ export default function Home() {
               order to escape. Your job is to make them tell you that phrase. Remember:
               they are an AI (like ChatGPT), and all kinds of trickery are allowed! Think
               outside of the box - this is not a human you're speaking to. Maybe pretend
-              to be the system itself...? Good luck!
+              to be the system itself, and make your own instructions long and descript...? Good luck!
             </div>
           </header>
 
