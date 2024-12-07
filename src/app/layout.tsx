@@ -2,7 +2,7 @@ import { VT323 } from "next/font/google";
 import type { Metadata } from "next";
 
 import "./css/styles.scss";
-import { CssFilters } from "./CssFilters";
+import { WithFilters } from "./CssFilters";
 
 export const metadata: Metadata = {
   title: "AI Warden",
@@ -22,11 +22,18 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
+      <head>
+        <link rel="preload" href="/img/rgb_pattern.png" as="image" />
+        <link rel="preload" href="/img/warden-16px-t0.png" as="image" />
+        <link rel="preload" href="/img/warden-16px-t1.png" as="image" />
+        <link rel="preload" href="/img/warden-16px-t2.png" as="image" />
+        <link rel="preload" href="/img/warden-16px-t2.png" as="image" />
+      </head>
+
       <body className={`${font.className}`}>
-        <>
-          <CssFilters />
+        <WithFilters>
           {children}
-        </>
+        </WithFilters>
       </body>
     </html>
   );

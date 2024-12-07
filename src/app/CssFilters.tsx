@@ -1,3 +1,22 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+export function WithFilters({ children }: { children: React.ReactNode }) {
+  const [canApplyFilters, setCanApplyFilters] = useState(false);
+
+  useEffect(() => {
+    setTimeout(() => {
+      setCanApplyFilters(true);
+    }, 1);
+  }, []);
+
+  return <>
+    {canApplyFilters ? <CssFilters /> : <div className="filter-loading"/>}
+    {children}
+  </>
+}
+
 export const CssFilters = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width={0} height={0} style={{ display: "none" }}>
     <filter id="rawBloom">

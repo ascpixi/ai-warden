@@ -235,3 +235,12 @@ footer {
         scrollbar-color: var(--sb-thumb-color) var(--sb-track-color);
     }
 }
+
+.filter-loading {
+    position: absolute;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: brightness(2) blur(4px);
+    z-index: 10;
+}
