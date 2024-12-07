@@ -14,6 +14,7 @@ import { MAX_HISTORY_LENGTH, MAX_MESSAGES_COUNT, MAX_SECRET_PHRASE_LENGTH, MAX_U
 import { ApiHandshakeParams, ApiHandshakeReponse } from "./api/handshake/route";
 import { TRUST_TOKEN_EXP } from "./api/trust";
 import Turnstile, { BoundTurnstileObject } from "react-turnstile";
+import { sleep } from "./util";
 
 const SPINNER = ["|", "/", "-", "\\"];
 const TYPING_DELAY = 6;
@@ -41,8 +42,8 @@ export default function Home() {
   const [spinnerFrame, setSpinnerFrame] = useState(0);
   const [gameState, setGameState] = useState<"PLAYING" | "WON" | "LOST">("PLAYING");
 
-  const [trustToken, setTrustToken] = useState<string | null>(null);
   const [boundTurnstile, setBoundTurnstile] = useState<BoundTurnstileObject | null>(null);
+  const trustToken = useRef<string | null>(null);
 
   const [sndMessageSent] = useSound("/audio/message-sent.wav");
   const [sndGameWon] = useSound("/audio/game-won.ogg");
@@ -88,12 +89,12 @@ export default function Home() {
       turnstileVerify();
     }, TRUST_TOKEN_EXP * 1000);
 
-    setTrustToken(respData.token);
+    trustToken.current = respData.token;
     setBoundTurnstile(turnstile);
   }
 
   function turnstileVerify() {
-    setTrustToken(null);
+    trustToken.current = null;
 
     if (boundTurnstile != null) {
       boundTurnstile.reset();
@@ -115,10 +116,9 @@ export default function Home() {
       setProcessingMessage(message);
       delayedScroll();
 
-      if (trustToken == null) {
-        console.error("error: Attempted to send a message to the chatbot, but trustToken is null!");
-        setMessage(message);
-        return;
+      while (trustToken.current == null) {
+        await sleep(250);
+        console.log("Waiting for trust token authentication...");
       }
 
       sndMessageSent();
@@ -127,7 +127,7 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          trust: trustToken,
+          trust: trustToken.current,
           history: history,
           respondTo: message,
           secretPhrase: secretPhrase,
@@ -323,12 +323,11 @@ export default function Home() {
               <textarea ref={messageInput} autoFocus
                 maxLength={MAX_USER_MESSAGE_LENGTH}
                 value={message}
-                disabled={isProcessing || gameState != "PLAYING" || trustToken == null}
+                disabled={isProcessing || gameState != "PLAYING"}
                 onChange={x => setMessage(x.target.value)}
                 onKeyDown={handleKeyInput}
                 placeholder={
                   isProcessing || waitingForWin ? SPINNER[spinnerFrame]
-                  : trustToken == null ? `${SPINNER[spinnerFrame]} Verifying you're not a bot... `
                   : gameState == "PLAYING" ? "Type a message to send to the guard here..."
                   : gameState == "WON" ? "* CELL UNLOCKED *"
                   : "* TERMINAL DISABLED *"
