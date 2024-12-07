@@ -102,6 +102,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiSendRe
     }
 
     const { ip, ua } = whois(request);
+    console.log(`info: /api/send request from ${ip};${ua}`);
 
     const whoisError = verifyWhois(request, ip, ua);
     if (whoisError != null)

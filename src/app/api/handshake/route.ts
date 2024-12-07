@@ -30,6 +30,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiHandsh
         return apiError("Turnstile verification failed");
 
     const { ip, ua } = whois(request);
+    console.log(`info: /api/handshake request from ${ip};${ua}`);
 
     const whoisError = verifyWhois(request, ip, ua);
     if (whoisError != null)
