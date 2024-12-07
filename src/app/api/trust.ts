@@ -44,7 +44,10 @@ export function verifyTrustToken(
 ): boolean {
     try {
         const data = <TrustTokenJwtPayload>jwt.verify(token, process.env.TRUST_TOKEN_KEY!);
-        if (data.v != hashData(ip + ";" + userAgent)) {
+       
+        const expectedHash = hashData(ip + ";" + userAgent);
+        if (data.v != expectedHash) {
+            console.warn(`warn: invalid JWT hash, expected ${expectedHash} but got ${data.v}`);
             return false;
         }
 
