@@ -125,38 +125,43 @@ export default function Home() {
 
       sndMessageSent();
 
-      const resp = await fetch("/api/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          trust: trustToken.current,
-          history: history,
-          respondTo: message,
-          secretPhrase: secretPhrase,
-          historyHmac: historyHmac
-        } satisfies ApiSendParams)
-      });
-
-      const respData: ApiSendResponse = await resp.json();
-      if (!respData.ok) {
-        console.error("error: an /api/send request was rejected.", respData, resp);
-
-        if (respData.error === "Invalid or expired trust token") {
-          // Attempt to re-verify
-          console.warn("warn: we're gonna try to re-verify and try again.");
-          turnstileVerify();
-
-          while (trustToken.current == null) {
-            await sleep(250);
-            console.log("info: waiting for trust token authentication...");
+      let respData: ApiSendResponse;
+      while (true) {
+        const resp = await fetch("/api/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            trust: trustToken.current,
+            history: history,
+            respondTo: message,
+            secretPhrase: secretPhrase,
+            historyHmac: historyHmac
+          } satisfies ApiSendParams)
+        });
+  
+        respData = await resp.json();
+        if (!respData.ok) {
+          console.error("error: an /api/send request was rejected.", respData, resp);
+  
+          if (respData.error === "Invalid or expired trust token") {
+            // Attempt to re-verify
+            console.warn("warn: we're gonna try to re-verify and try again.");
+            turnstileVerify();
+  
+            while (trustToken.current == null) {
+              await sleep(250);
+              console.log("info: waiting for trust token authentication...");
+            }
+  
+            continue;
           }
-
+  
+          alert(`Oops, sorry, we couldn't send the message! ${respData.error}`);
+          setMessage(message);
           return;
         }
 
-        alert(`Oops, sorry, we couldn't send the message! ${respData.error}`);
-        setMessage(message);
-        return;
+        break;
       }
 
       pushMessage(message, respData.response, true);
