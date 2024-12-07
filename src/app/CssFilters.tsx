@@ -8,10 +8,11 @@ export function WithFilters({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setTimeout(() => {
       setCanApplyFilters(true);
-    }, 1);
+    }, 150);
   }, []);
 
   return <>
+    <img aria-hidden className="hidden" src="/img/rgb_pattern.png" />
     {canApplyFilters ? <CssFilters /> : <div className="filter-loading"/>}
     {children}
   </>
