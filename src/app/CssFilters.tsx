@@ -66,7 +66,6 @@ export const CssFilters = () => (
 
     <filter id="crt">
       <feImage xlinkHref="/img/rgb_pattern.png" width="6" height="4" result="rgbPattern" />
-      <feImage xlinkHref="/img/rgb_pattern.png" width="6" height="4" result="rgbPattern" />
       {/* <feImage xlinkHref="/img/crt_displacement.png" result="crtDisplacement" /> */}
 
       <feTile in="rgbPattern" result="crtMatrix" />
