@@ -91,6 +91,8 @@ export default function Home() {
 
     trustToken.current = respData.token;
     setBoundTurnstile(turnstile);
+
+    console.log("info: trust token obtained: ", trustToken.current);
   }
 
   function turnstileVerify() {

@@ -49,7 +49,8 @@ export function verifyTrustToken(
         }
 
         return true;
-    } catch {
+    } catch (err) {
+        console.warn("warn: JWT verification failed: ", err);
         return false;
     }
 }
