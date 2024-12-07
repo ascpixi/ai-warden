@@ -7,6 +7,10 @@ export function WithFilters({ children }: { children: React.ReactNode }) {
   const [shouldShift, setShouldShift] = useState(true);
 
   useEffect(() => {
+    if (navigator.userAgent.includes("Firefox")) {
+      alert("It looks like you're using Firefox - please be advised that SVG filters are not hardware-accelerated on Firefox and cause performance issues. If you're having lag, please switch to a browser like Chrome.");
+    }
+
     (async () => {
       await sleep(150);
       setShouldShift(false);
@@ -27,7 +31,10 @@ export function WithFilters({ children }: { children: React.ReactNode }) {
 }
 
 export const CssFilters = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width={0} height={0} style={{ display: "none" }}>
+  <svg xmlns="http://www.w3.org/2000/svg" width={0} height={0} style={{
+    position: "absolute",
+    opacity: 0
+  }}>
     <filter id="rawBloom">
       <feGaussianBlur in="SourceGraphic" stdDeviation="12" result="exposure" />
       <feGaussianBlur in="SourceGraphic" stdDeviation="64" result="spread" />
