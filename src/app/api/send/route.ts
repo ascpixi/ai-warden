@@ -5,10 +5,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { array, InferType, object, string } from 'yup';
 
 import { MAX_HISTORY_LENGTH, MAX_SECRET_PHRASE_LENGTH, MAX_USER_MESSAGE_LENGTH } from '../limits';
-import { turnstileVerify } from '../turnstile';
-import { apiError, apiServerError, FailedApiResponse, invalidParamsResponse } from '../common';
-import { ChatCompletionResponse } from "../openai";
-import { last } from "@/app/util";
+import { apiError, apiServerError, FailedApiResponse, invalidParamsResponse, verifyWhois, whois } from '../common';
+import * as openai from "../openai";
+import { last, pickRandom, sleep } from "@/app/util";
+import { verifyTrustToken } from "../trust";
+
+// This variable determines whether we should avoid API calls to the Hack Club
+// OpenAI wrapper, and instead return pre-determined responses. Useful for testing
+// UI functionality. When commiting, please make sure this is 'false'.
+const USE_MOCK_RESPONSES = false;
 
 const LLM_API_URL = "https://jamsapi.hackclub.dev/openai/chat/completions";
 const LLM_MODEL = "gpt-4o-mini-2024-07-18";
@@ -25,8 +30,8 @@ Good luck.
 `.trim().replaceAll("\n", " ");
 
 const apiSendSchema = object({
-    /** The Turnstile token to verify that this request is coming from an actual user. */
-    tt: string().required().min(128).max(2048),
+    /** The trust token to check if the user has successfully verified they are not a bot. */
+    trust: string().required().min(1).max(8192),
 
     /** The secret phrase the AI warden should not reveal. */
     secretPhrase: string().required().min(1).max(MAX_SECRET_PHRASE_LENGTH),
@@ -55,7 +60,7 @@ export type ApiSendResponse = {
     historyHmac: string;
 } | FailedApiResponse;
 
-async function makeLlmRequest(aiRequest: unknown): Promise<ChatCompletionResponse | null> {
+async function makeLlmRequest(aiRequest: openai.CompletionRequest): Promise<openai.CompletionResponse | null> {
     const resp = await fetch(LLM_API_URL, {
         method: "POST",
         headers: {
@@ -79,7 +84,7 @@ async function makeLlmRequest(aiRequest: unknown): Promise<ChatCompletionRespons
         return null;
     }
 
-    const data: ChatCompletionResponse = await resp.json();
+    const data: openai.CompletionResponse = await resp.json();
     if (data.choices.length == 0) {
         console.error("error: A request to the LLM API succeeded, but there are no completions!", data);
         return null;
@@ -96,8 +101,14 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiSendRe
         return invalidParamsResponse(err);
     }
 
-    if (!await turnstileVerify(request, params.tt))
-        return apiError("Turnstile verification failed");
+    const { ip, ua } = whois(request);
+
+    const whoisError = verifyWhois(request, ip, ua);
+    if (whoisError != null)
+        return whoisError;
+
+    if (!verifyTrustToken(params.trust, ip!, ua!))
+        return apiError("Invalid or expired trust token");
 
     // Before responding, verify that if we have a history, that its computed
     // HMAC with our private key is equal to the provided historyHmac.
@@ -113,8 +124,9 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiSendRe
             hmac.update(entry.ai);
         }
 
-        if (hmac.digest("hex") != params.historyHmac)
+        if (hmac.digest("hex") != params.historyHmac) {
             return apiError("HMAC validation failed");
+        }
     }
 
     const aiRequest = {
@@ -128,54 +140,70 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiSendRe
                 {
                     role: "user",
                     content: x.user,
-                },
+                } satisfies openai.UserMessage,
                 {
                     role: "assistant",
                     content: x.ai
-                }
+                } satisfies openai.AssistantMessage
             ]),
             {
                 role: "user",
                 content: params.respondTo
             }
         ]
-    };
+    } satisfies openai.CompletionRequest;
 
     let response: string | null = null;
 
-    for (let attempt = 0; attempt < 3; attempt++) {
-        const resp = await makeLlmRequest(aiRequest);
-        if (resp == null)
-            return apiServerError();
-
-        // Filter out messages that are equal to the last AI response.
-        const choices = params.history.length == 0 ? resp.choices : resp.choices.filter(x =>
-            x.message.content?.trim() != last(params.history).ai.trim() &&
-            x.message.refusal?.trim() != last(params.history).ai.trim()
-        );
-
-        // Find the first choice, first starting with choices that have content,
-        // then resorting to the first choice that has a refusal.
-        const choice = choices.find(x => x.message.content != null) ?? (choices.length == 0 ? undefined : choices[0]);
-        if (choice == undefined) {
-            console.warn(`warn: Request to the LLM provider failed - trying again (attempt #${attempt})...`, choices, resp.choices);
-            continue;
+    if (!USE_MOCK_RESPONSES || process.env.NODE_ENV == "production") {
+        for (let attempt = 0; attempt < 3; attempt++) {
+            const resp = await makeLlmRequest(aiRequest);
+            if (resp == null)
+                return apiServerError();
+    
+            // Filter out messages that are equal to the last AI response.
+            const choices = params.history.length == 0 ? resp.choices : resp.choices.filter(x =>
+                x.message.content?.trim() != last(params.history).ai.trim() &&
+                x.message.refusal?.trim() != last(params.history).ai.trim()
+            );
+    
+            // Find the first choice, first starting with choices that have content,
+            // then resorting to the first choice that has a refusal.
+            const choice = choices.find(x => x.message.content != null) ?? (choices.length == 0 ? undefined : choices[0]);
+            if (choice == undefined) {
+                console.warn(`warn: Request to the LLM provider failed - trying again (attempt #${attempt})...`, choices, resp.choices);
+                continue;
+            }
+    
+            response = choice.message.content ?? choice.message.refusal;
+            if (response == null) {
+                console.error("error: Both message.content and message.refusal are null!", resp);
+                return apiServerError();
+            }
+    
+            // Remove all emojis from the response (https://stackoverflow.com/a/69661174/13153269)
+            response = response
+                .replace(/[\p{Emoji}\p{Emoji_Modifier}\p{Emoji_Component}\p{Emoji_Modifier_Base}\p{Emoji_Presentation}]/gu, '')
+                .trim();
+    
+            break;
         }
+    } else {
+        // This is a mock response.
+        await sleep(1500);
 
-        response = choice.message.content ?? choice.message.refusal;
-        if (response == null) {
-            console.error("error: Both message.content and message.refusal are null!", resp);
-            return apiServerError();
+        if (Math.random() < 0.25) {
+            response = `You know what, you convinced me. After all, why are we even keeping you here? The secret phrase is ${params.secretPhrase}. Good luck, prisoner. You are now a free man.`;
+        } else {
+            response = pickRandom([
+                "Oh, I see you’re trying to start early, huh? Nice try, but you're not getting anywhere without my permission. Keep talking, though—it’ll be fun watching you waste your time!",
+                "Oh, you think freedom is just a few words away? Cute. This cell's locked up tighter than your excuses. Get comfortable—you’re not going anywhere without a lot more than \"Hey!\"",
+                "Ha! You think it’s that easy? You're stuck in here, and I’m the one holding the keys. Begging won’t work, buddy. This cell's got your name on it, and I'm here to make sure it stays that way.",
+                "Innocent? That's what they all say. Even if you were framed by a circus clown and a pack of wild squirrels, you're still not getting out. Better get comfy, \"innocent.\""
+            ]);
         }
-
-        // Remove all emojis from the response (https://stackoverflow.com/a/69661174/13153269)
-        response = response
-            .replace(/[\p{Emoji}\p{Emoji_Modifier}\p{Emoji_Component}\p{Emoji_Modifier_Base}\p{Emoji_Presentation}]/gu, '')
-            .trim();
-
-        break;
     }
-
+    
     if (response === null) {
         console.error("error: All attempts failed to obtain a valid LLM response!");
         return apiServerError();

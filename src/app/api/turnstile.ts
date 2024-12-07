@@ -1,5 +1,3 @@
-"use server";
-
 import { NextRequest } from "next/server";
 
 /**
@@ -25,10 +23,11 @@ export async function turnstileVerify(req: NextRequest, token: string) {
             body: body,
             method: "POST"
         });
-    
+
         const outcome = await result.json();
-        if (!outcome.success)
+        if (!outcome.success) {
             return false;
+        }
     } catch (err) {
         console.warn("warn: an error occured while verifying with Turnstile:", err);
         return false;

@@ -5,23 +5,70 @@
     font-variant-ligatures: none;
 }
 
-html, body {
+html, body, #synthetic-body {
     width: 100%;
     height: 100%;
     margin: 0;
+    overflow-x: hidden;
 }
 
-body {
+#synthetic-body {
     font-size: 1.5em;
     background-color: #000;
-    background-image: radial-gradient(ellipse, #000 0%, #05321e9c 100%);
+    background-image: radial-gradient(ellipse, #000 0%, var(--atmosphere) 100%);
     background-repeat: repeat-y;
+}
+
+#synthetic-body {
+    &.theme-0 {
+        &, & a, & textarea {
+            color: #5bf870;
+            --atmosphere: #05321e9c;
+            --border-color: #00ee00aa;
+            --secret-fg: black;
+            --secret-bg: white;
+            --sb-track-color: #0a2719;
+            --sb-thumb-color: #65ca6c;
+        }
+    }
+
+    &.theme-1 {
+        &, & a, & textarea {
+            color: #ff8622;
+            --atmosphere: #321b059c;
+            --border-color: #ee7f00aa;
+            --secret-fg: black;
+            --secret-bg: white;
+            --sb-track-color: #27160a;
+            --sb-thumb-color: #d4804f;
+        }
+    }
+
+    &.theme-2 {
+        &, & a, & textarea {
+            color: #d1d1d1;
+            --atmosphere: #2629289c;
+            --border-color: #f0f0f0aa;
+            --secret-fg: black;
+            --secret-bg: white;
+            --sb-track-color: #292929;
+            --sb-thumb-color: #999999;
+        }
+    }
+}
+
+body, textarea, a {
+    font-family: var(--vt323);
 }
 
 #app-root {
     width: 100%;
     height: 100%;
     padding: 3em 2em;
+
+    @include sm {
+        padding: 3em 6em;
+    }
 
     &.crt {
         filter: url(#bloom) url(#crt);
@@ -30,15 +77,6 @@ body {
     &.load-crt {
         filter: url(#crt) url(#bloom) url(#crt) blur(4px);
     }
-
-    @include sm {
-        padding: 3em 6em;
-    }
-}
-
-body, textarea, a {
-    color: #5bf870;
-    font-family: var(--vt323);
 }
 
 #app {
@@ -55,7 +93,7 @@ header {
 
     .initial-prompt {
         padding-left: 1em;
-        border-left: 4px solid #00ee00aa;
+        border-left: 4px solid var(--border-color);
     }
 }
 
@@ -110,6 +148,11 @@ footer {
         @include sm {
             padding-right: 6em;
         }
+
+        img {
+            user-select: none;
+            pointer-events: none;
+        }
     }
 
     .user::before {
@@ -126,18 +169,69 @@ footer {
     }
 
     .secret-phrase {
-        background-color: white;
-        color: black;
+        background-color: var(--secret-bg);
+        color: var(--secret-fg);
         padding: 0 .25em;
     }
 
     &.system {
         padding-left: 1em;
-        border-left: 4px solid #00ee00aa;
+        border-left: 4px solid var(--border-color);
 
         .bot {
             flex-direction: column;
             align-items: start;
         }
+    }
+}
+
+#header-top {
+    display: flex;
+    gap: 0.5em;
+    margin-bottom: 1em;
+    flex-direction: column;
+    
+    @include md {
+        flex-direction: row;
+    }
+
+    #main-nav {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5em;
+
+        @include md {
+            flex-direction: row;
+
+            > div:not(:last-child)::after {
+                content: " |";
+            }
+        }
+
+        > div {
+            text-wrap: nowrap;
+        }
+    }    
+}
+
+#synthetic-body {
+    $sb-size: 12px;
+
+    &::-webkit-scrollbar {
+        width: $sb-size;
+    }
+
+    &::-webkit-scrollbar-track {
+        background: var(--sb-track-color);
+        border-radius: 0px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+        background: var(--sb-thumb-color);
+        border-radius: 0px;
+    }
+
+    @supports not selector(::-webkit-scrollbar) {
+        scrollbar-color: var(--sb-thumb-color) var(--sb-track-color);
     }
 }

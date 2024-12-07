@@ -24,7 +24,7 @@ export default function RootLayout({
     <html lang="en" className="dark">
       <body className={`${font.className}`}>
         <>
-          <CssFilters/>
+          <CssFilters />
           {children}
         </>
       </body>

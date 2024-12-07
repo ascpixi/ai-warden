@@ -38,7 +38,7 @@ export const CssFilters = () => (
 
     <filter id="crt">
       <feImage xlinkHref="/img/rgb_pattern.png" width="6" height="4" result="rgbPattern" />
-      <feImage xlinkHref="/img/crt_displacement.png" result="crtDisplacement" />
+      {/* <feImage xlinkHref="/img/crt_displacement.png" result="crtDisplacement" /> */}
 
       <feTile in="rgbPattern" result="crtMatrix" />
       <feComposite in="crtMatrix" in2="SourceAlpha" operator="in" result="crtMatrix" />

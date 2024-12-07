@@ -1,6 +1,6 @@
 {
   "name": "ai-warden",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -9,12 +9,15 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@types/jsonwebtoken": "^9.0.7",
+    "jsonwebtoken": "^9.0.2",
     "next": "15.0.3",
     "random-words": "^2.0.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-turnstile": "^1.1.4",
     "typewriter-effect": "^2.21.0",
+    "use-sound": "^4.0.3",
     "yup": "^1.4.0"
   },
   "devDependencies": {

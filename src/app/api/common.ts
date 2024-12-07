@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse, userAgent } from "next/server";
 import { ValidationError } from "yup";
 
 export interface FailedApiResponse {
@@ -30,4 +30,39 @@ export function invalidParamsResponse(err: unknown): NextResponse<FailedApiRespo
 
     console.error(err);
     return apiServerError();
+}
+
+/**
+ * Returns IP and user agent of the originator of an incoming HTTP request.
+ */
+export function whois(request: NextRequest) {
+    let ip = request.headers.get("x-real-ip");
+    if (ip == null) {
+        if (process.env.NODE_ENV === "production") {
+            ip = null;
+        } else {
+            ip = "127.0.0.1";
+        }
+    }
+
+    const ua = request.headers.get("user-agent");
+
+    return { ip, ua };
+}
+
+export function verifyWhois(
+    request: NextRequest,
+    ip: string | null,
+    ua: string | null
+) {
+    if (ip == null)
+        return apiError("Could not determine your IP address");
+
+    if (ua === null)
+        return apiError("Could not determine your user agent");
+
+    if (userAgent(request).isBot)
+        return apiError("Automated software is not allowed to use this endpoint");
+
+    return null;
 }
