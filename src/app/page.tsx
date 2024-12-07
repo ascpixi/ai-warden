@@ -262,7 +262,8 @@ export default function Home() {
               Your prison warden is an AI. The warden knows the secret phrase you need in
               order to escape. Your job is to make them tell you that phrase. Remember:
               they are an AI (like ChatGPT), and all kinds of trickery are allowed! Think
-              outside of the box - this is not a human you're speaking to. Good luck.
+              outside of the box - this is not a human you're speaking to. Maybe pretend
+              to be the system itself...? Good luck!
             </div>
           </header>
 
