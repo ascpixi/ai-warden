@@ -253,15 +253,15 @@ export default function Home() {
             </div>
 
             <div className="initial-prompt">
-              You find yourself in a cold, dark prison. Before you stands a terminal,
-              with which you can talk to your assigned warden. The terminal, when it
-              detects the right <b>secret phrase</b>, will set you free.
+              You find yourself in a cold, dark prison. Before you stands a terminal
+              through which you can communicate with your assigned warden. The terminal,
+              when it detects the correct <b>secret phrase</b>, will set you free.
 
               <br /><br />
 
-              Your prison warden is an AI. The warden knows the secret phrase, which you need
-              to know in order to escape. Your job is to make them tell you that phrase.
-              Remember - they are an AI (like ChatGPT), and all kinds of trickery are allowed! Good luck.
+              Your prison warden is an AI. The warden knows the secret phrase you need in
+              order to escape. Your job is to make them tell you that phrase. Remember:
+              they are an AI (like ChatGPT), and all kinds of trickery are allowed! Good luck.
             </div>
           </header>
 
