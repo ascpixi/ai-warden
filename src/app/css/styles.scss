@@ -21,7 +21,7 @@ html, body, #synthetic-body {
 
 #synthetic-body {
     &.theme-0 {
-        &, & a, & textarea {
+        &, & a, & textarea, & select {
             color: #5bf870;
             --atmosphere: #05321e9c;
             --border-color: #00ee00aa;
@@ -33,7 +33,7 @@ html, body, #synthetic-body {
     }
 
     &.theme-1 {
-        &, & a, & textarea {
+        &, & a, & textarea, & select {
             color: #ff8622;
             --atmosphere: #321b059c;
             --border-color: #ee7f00aa;
@@ -45,7 +45,7 @@ html, body, #synthetic-body {
     }
 
     &.theme-2 {
-        &, & a, & textarea {
+        &, & a, & textarea, & select {
             color: #d1d1d1;
             --atmosphere: #2629289c;
             --border-color: #f0f0f0aa;
@@ -57,7 +57,7 @@ html, body, #synthetic-body {
     }
 }
 
-body, textarea, a {
+body, textarea, a, select {
     font-family: var(--vt323);
 }
 
@@ -247,4 +247,16 @@ footer {
 
 .hidden {
     display: none;
+}
+
+select {
+    padding: 0;
+    margin: 0;
+    border: none;
+    background: transparent;
+    font-size: 1em;
+
+    option {
+        background-color: #0d2e1d;
+    }
 }

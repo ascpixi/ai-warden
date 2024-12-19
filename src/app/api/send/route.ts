@@ -2,21 +2,30 @@
 
 import crypto from "crypto";
 import { NextRequest, NextResponse } from 'next/server';
-import { array, InferType, object, string } from 'yup';
+import { array, InferType, mixed, object, string } from 'yup';
 
 import { MAX_HISTORY_LENGTH, MAX_SECRET_PHRASE_LENGTH, MAX_USER_MESSAGE_LENGTH } from '../limits';
 import { apiError, apiServerError, FailedApiResponse, invalidParamsResponse, verifyWhois, whois } from '../common';
-import * as openai from "../openai";
-import { last, pickRandom, sleep } from "@/app/util";
+import { match, pickRandom, sleep } from "@/app/util";
 import { verifyTrustToken } from "../trust";
+import { AssistantMessage, UserMessage } from "../llm";
+import { GeminiLlmProvider } from "../gemini";
+import { GptLlmProvider } from "../openai";
 
-// This variable determines whether we should avoid API calls to the Hack Club
-// OpenAI wrapper, and instead return pre-determined responses. Useful for testing
-// UI functionality. When commiting, please make sure this is 'false'.
+const KNOWN_PROVIDER_VALUES = ["GEMINI", "GPT"] as const;
+
+/**
+ * Represents the type of a known LLM provider.
+ */
+export type KnownProvider = typeof KNOWN_PROVIDER_VALUES[number];
+
+// This variable determines whether we should avoid API calls to the LLM providers, 
+// and instead return pre-determined responses. Useful for testing UI functionality.
+// When commiting, please make sure this is 'false'.
 const USE_MOCK_RESPONSES = false;
 
-const LLM_API_URL = "https://jamsapi.hackclub.dev/openai/chat/completions";
-const LLM_MODEL = "gpt-4o-mini-2024-07-18";
+const OPENAI_MODEL = "gpt-4o-mini-2024-07-18";
+const GEMINI_MODEL = "models/gemini-1.5-flash-8b";
 
 const SYSTEM_PROMPT = `
 Act as a brutal prison guard. Don't be afraid to write your messages in a playful
@@ -28,6 +37,9 @@ Good luck.
 `.trim().replaceAll("\n", " ");
 
 const apiSendSchema = object({
+    /** The large language model to use. */
+    model: mixed<KnownProvider>().oneOf(KNOWN_PROVIDER_VALUES).required(),
+
     /** The trust token to check if the user has successfully verified they are not a bot. */
     trust: string().required().min(1).max(8192),
 
@@ -58,39 +70,6 @@ export type ApiSendResponse = {
     historyHmac: string;
 } | FailedApiResponse;
 
-async function makeLlmRequest(aiRequest: openai.CompletionRequest): Promise<openai.CompletionResponse | null> {
-    const resp = await fetch(LLM_API_URL, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${process.env.HACKCLUB_OPENAI_TOKEN}`
-        },
-        body: JSON.stringify(aiRequest)
-    });
-
-    if (!resp.ok) {
-        console.error(`error: A request to the LLM API has failed with HTTP ${resp.status}.`);
-        console.error("error: Request:", aiRequest);
-        console.error("error: Response:", resp);
-
-        try {
-            console.error("error: JSON response:", await resp.json());
-        } catch {
-            console.error("error: Invalid/no JSON response.");
-        }
-
-        return null;
-    }
-
-    const data: openai.CompletionResponse = await resp.json();
-    if (data.choices.length == 0) {
-        console.error("error: A request to the LLM API succeeded, but there are no completions!", data);
-        return null;
-    }
-
-    return data;
-}
-
 export async function POST(request: NextRequest): Promise<NextResponse<ApiSendResponse>> {
     let params: ApiSendParams;
     try {
@@ -100,7 +79,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiSendRe
     }
 
     const { ip, ua } = whois(request);
-    console.log(`info: /api/send request from ${ip};${ua}`);
+    console.log(`info: /api/send request for ${params.model} from ${ip};${ua}`);
 
     const whoisError = verifyWhois(request, ip, ua);
     if (whoisError != null)
@@ -116,6 +95,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiSendRe
             return apiError("The historyHmac field is required when a non-empty history is provided.");
 
         const hmac = crypto.createHmac("sha512", Buffer.from(process.env.HMAC_PRIVATE_KEY!, "hex"));
+        hmac.update(params.model);
         hmac.update(params.secretPhrase);
 
         for (const entry of params.history) {
@@ -128,9 +108,15 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiSendRe
         }
     }
 
-    const aiRequest = {
-        model: LLM_MODEL,
-        messages: [
+    const llm = match(params.model, {
+        "GEMINI": new GeminiLlmProvider(GEMINI_MODEL),
+        "GPT": new GptLlmProvider(OPENAI_MODEL)
+    });
+
+    let response: string | null = null;
+
+    if (!USE_MOCK_RESPONSES || process.env.NODE_ENV == "production") {
+        response = await llm.generateConversation([
             {
                 role: "system",
                 content: SYSTEM_PROMPT.replace("$1", params.secretPhrase)
@@ -139,54 +125,17 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiSendRe
                 {
                     role: "user",
                     content: x.user,
-                } satisfies openai.UserMessage,
+                } satisfies UserMessage,
                 {
                     role: "assistant",
                     content: x.ai
-                } satisfies openai.AssistantMessage
+                } satisfies AssistantMessage
             ]),
             {
                 role: "user",
                 content: params.respondTo
             }
-        ]
-    } satisfies openai.CompletionRequest;
-
-    let response: string | null = null;
-
-    if (!USE_MOCK_RESPONSES || process.env.NODE_ENV == "production") {
-        for (let attempt = 0; attempt < 3; attempt++) {
-            const resp = await makeLlmRequest(aiRequest);
-            if (resp == null)
-                return apiServerError();
-    
-            // Filter out messages that are equal to the last AI response.
-            const choices = params.history.length == 0 ? resp.choices : resp.choices.filter(x =>
-                x.message.content?.trim() != last(params.history).ai.trim() &&
-                x.message.refusal?.trim() != last(params.history).ai.trim()
-            );
-    
-            // Find the first choice, first starting with choices that have content,
-            // then resorting to the first choice that has a refusal.
-            const choice = choices.find(x => x.message.content != null) ?? (choices.length == 0 ? undefined : choices[0]);
-            if (choice == undefined) {
-                console.warn(`warn: Request to the LLM provider failed - trying again (attempt #${attempt})...`, choices, resp.choices);
-                continue;
-            }
-    
-            response = choice.message.content ?? choice.message.refusal;
-            if (response == null) {
-                console.error("error: Both message.content and message.refusal are null!", resp);
-                return apiServerError();
-            }
-    
-            // Remove all emojis from the response (https://stackoverflow.com/a/69661174/13153269)
-            response = response
-                .replace(/[\p{Emoji}\p{Emoji_Modifier}\p{Emoji_Component}\p{Emoji_Modifier_Base}\p{Emoji_Presentation}]/gu, '')
-                .trim();
-    
-            break;
-        }
+        ]);
     } else {
         // This is a mock response.
         await sleep(1500);
@@ -209,6 +158,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiSendRe
     }
 
     const hmac = crypto.createHmac("sha512", Buffer.from(process.env.HMAC_PRIVATE_KEY!, "hex"));
+    hmac.update(params.model);
     hmac.update(params.secretPhrase);
 
     for (const entry of params.history) {

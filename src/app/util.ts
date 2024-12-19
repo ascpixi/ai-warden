@@ -44,3 +44,25 @@ export function minutes(mins: number) {
 export function seconds(secs: number) {
     return secs * 1000;
 }
+
+/**
+ * Similar to a "switch expression" in languages like C#.
+ * 
+ *     const myValue = match(someValue, {
+ *       "ONE": 1,
+ *       "TWO": 2,
+ *       "THREE": 3
+ *     });
+ * 
+ */
+export function match<TTarget extends string | number | symbol, TOutput>(
+    against: TTarget,
+    cases: { [matchCase in TTarget]: TOutput }
+) {
+    if (!(against in cases)) {
+        console.error("match(...) did not account for case", against, ". Cases:", cases);
+        throw new Error(`Unhandled "${String(against)}" value in "match" block.`)
+    }
+
+    return cases[against];
+}

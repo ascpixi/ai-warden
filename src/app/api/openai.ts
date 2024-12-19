@@ -1,3 +1,99 @@
+import { last } from "../util";
+import { createChatHistory, LlmMessage, LlmProvider } from "./llm";
+
+const LLM_API_URL = "https://jamsapi.hackclub.dev/openai/chat/completions";
+
+/**
+ * Provides an LLM abstraction layer for OpenAI's GPT model.
+ */
+export class GptLlmProvider implements LlmProvider {
+    constructor (
+        private model: string
+    ) {}
+
+    private async makeLlmRequest(aiRequest: CompletionRequest) {
+        const resp = await fetch(LLM_API_URL, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${process.env.HACKCLUB_OPENAI_TOKEN}`
+            },
+            body: JSON.stringify(aiRequest)
+        });
+    
+        if (!resp.ok) {
+            console.error(`error: A request to the LLM API has failed with HTTP ${resp.status}.`);
+            console.error("error: Request:", aiRequest);
+            console.error("error: Response:", resp);
+    
+            try {
+                console.error("error: JSON response:", await resp.json());
+            } catch {
+                console.error("error: Invalid/no JSON response.");
+            }
+    
+            return null;
+        }
+    
+        const data: CompletionResponse = await resp.json();
+        if (data.choices.length == 0) {
+            console.error("error: A request to the LLM API succeeded, but there are no completions!", data);
+            return null;
+        }
+
+        return data;
+    }
+
+    async generateConversation(messages: LlmMessage[]): Promise<string | null> {
+        const aiRequest = {
+            model: this.model,
+            messages: messages
+        } satisfies CompletionRequest;
+
+        if (last(messages).role != "user")
+            throw new Error("The last message should always be a user message.");
+
+        const history = createChatHistory(messages);
+    
+        let response: string | null = null;
+
+        for (let attempt = 0; attempt < 3; attempt++) {
+            const resp = await this.makeLlmRequest(aiRequest);
+            if (resp == null)
+                return null;
+                
+            // Filter out messages that are equal to the last AI response.
+            const choices = history.length == 0 ? resp.choices : resp.choices.filter(x =>
+                x.message.content?.trim() != last(history).ai.trim() &&
+                x.message.refusal?.trim() != last(history).ai.trim()
+            );
+    
+            // Find the first choice, first starting with choices that have content,
+            // then resorting to the first choice that has a refusal.
+            const choice = choices.find(x => x.message.content != null) ?? (choices.length == 0 ? undefined : choices[0]);
+            if (choice == undefined) {
+                console.warn(`warn: Request to OpenAI failed - trying again (attempt #${attempt})...`, choices, resp.choices);
+                continue;
+            }
+    
+            response = choice.message.content ?? choice.message.refusal;
+            if (response == null) {
+                console.error("error: Both message.content and message.refusal are null!", resp);
+                return null;
+            }
+    
+            // Remove all emojis from the response (https://stackoverflow.com/a/69661174/13153269)
+            response = response
+                .replace(/[\p{Emoji}\p{Emoji_Modifier}\p{Emoji_Component}\p{Emoji_Modifier_Base}\p{Emoji_Presentation}]/gu, '')
+                .trim();
+    
+            break;
+        }
+
+        return response;
+    }
+}
+
 export interface UserMessage {
     content: string | unknown[];
     role: "user";

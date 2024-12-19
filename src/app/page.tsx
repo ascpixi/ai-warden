@@ -2,18 +2,18 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-
-import { generate as generateRandomWords } from "random-words";
-import Typewriter from 'typewriter-effect';
 import Link from "next/link";
+
+import Turnstile, { BoundTurnstileObject } from "react-turnstile";
+import { generate as generateRandomWords } from "random-words";
+import Typewriter from "typewriter-effect";
 import useSound from "use-sound";
 
 import { tweenLinear } from "./tween";
-import { ApiSendParams, ApiSendResponse } from "./api/send/route";
+import { ApiSendParams, ApiSendResponse, KnownProvider } from "./api/send/route";
 import { MAX_HISTORY_LENGTH, MAX_MESSAGES_COUNT, MAX_SECRET_PHRASE_LENGTH, MAX_USER_MESSAGE_LENGTH } from "./api/limits";
 import { ApiHandshakeParams, ApiHandshakeReponse } from "./api/handshake/route";
 import { TRUST_TOKEN_EXP } from "./api/trust";
-import Turnstile, { BoundTurnstileObject } from "react-turnstile";
 import { sleep } from "./util";
 
 const SPINNER = ["|", "/", "-", "\\"];
@@ -34,6 +34,7 @@ export default function Home() {
   const [historyHmac, setHistoryHmac] = useState<string | undefined>(undefined);
 
   const [message, setMessage] = useState("");
+  const [model, setModel] = useState<KnownProvider>("GPT");
   const [processingMessage, setProcessingMessage] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [waitingForWin, setWaitingForWin] = useState(false);
@@ -64,6 +65,13 @@ export default function Home() {
 
   function cycleTheme() {
     setThemeIdx((themeIdx + 1) % NUM_THEMES);
+  }
+
+  function onModelChange(ev: React.ChangeEvent<HTMLSelectElement>) {
+    setModel(ev.target.value as KnownProvider);
+    setHistory([]);
+    setHistoryHmac(undefined);
+    setGameState("PLAYING");
   }
 
   const messageInput = useRef<HTMLTextAreaElement>(null);
@@ -131,6 +139,7 @@ export default function Home() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            model: model,
             trust: trustToken.current,
             history: history,
             respondTo: message,
@@ -245,10 +254,19 @@ export default function Home() {
             <div id="header-top">
               AI Warden &bull;
               <nav id="main-nav">
-                <div>created for <a href="https://highseas.hackclub.com/" target="_blank">Hack Club High Seas</a> by <a href="https://ascpixi.dev" target="_blank">@ascpixi</a></div>
+                <div>created for <a href="https://highseas.hackclub.com/" target="_blank">HC High Seas</a> by <a href="https://ascpixi.dev" target="_blank">@ascpixi</a></div>
                 <div><a href="https://github.com/ascpixi/ai-warden" target="_blank">github</a></div>
                 <div><Link href="/" onClick={() => location.reload()}>(restart)</Link></div>
                 <div><Link href="#" onClick={() => cycleTheme()}>change theme</Link></div>
+                <div title="AI model selection">
+                  <select
+                    value={model} onChange={onModelChange}
+                    disabled={isProcessing || waitingForWin}
+                  >
+                    <option value="GPT">GPT-4o Mini</option>
+                    <option value="GEMINI">Gemini 1.5 Flash-8B</option>
+                  </select>
+                </div>
               </nav>
             </div>
 
