@@ -21,8 +21,9 @@ html, body, #synthetic-body {
 
 #synthetic-body {
     &.theme-0 {
-        &, & a, & textarea, & select {
+        &, & a, & textarea, & select, & button {
             color: #5bf870;
+            --fg: #5bf870;
             --atmosphere: #05321e9c;
             --border-color: #00ee00aa;
             --secret-fg: black;
@@ -33,8 +34,9 @@ html, body, #synthetic-body {
     }
 
     &.theme-1 {
-        &, & a, & textarea, & select {
+        &, & a, & textarea, & select, & button {
             color: #ff8622;
+            --fg: #ff8622;
             --atmosphere: #321b059c;
             --border-color: #ee7f00aa;
             --secret-fg: black;
@@ -45,8 +47,9 @@ html, body, #synthetic-body {
     }
 
     &.theme-2 {
-        &, & a, & textarea, & select {
+        &, & a, & textarea, & select, & button {
             color: #d1d1d1;
+            --fg: #d1d1d1;
             --atmosphere: #2629289c;
             --border-color: #f0f0f0aa;
             --secret-fg: black;
@@ -57,7 +60,7 @@ html, body, #synthetic-body {
     }
 }
 
-body, textarea, a, select {
+body, textarea, a, select, .btn {
     font-family: var(--vt323);
 }
 
@@ -81,6 +84,10 @@ body, textarea, a, select {
 
 #app {
     padding-bottom: 4em;
+}
+
+.dim {
+    opacity: 0;
 }
 
 header {
@@ -253,10 +260,58 @@ select {
     padding: 0;
     margin: 0;
     border: none;
+    border-bottom: 2px solid var(--border-color);
     background: transparent;
     font-size: 1em;
+    outline: none !important;
 
     option {
         background-color: #0d2e1d;
+    }
+}
+
+.dialog {
+    display: none;
+    position: absolute;
+    z-index: 10;
+
+    top: 50vh;
+    transform: translateY(-50%);
+    left: 0;
+    margin: 0 2em;
+
+    flex-direction: column;
+
+    &.shown {
+        display: flex;
+    }
+    
+    & > .content {
+        padding: 2em;
+        border: 4px solid var(--border-color);
+    }
+
+    & > header {
+        margin: 0;
+        background-color: var(--fg);
+        color: black;
+        padding: .5em 1em;
+
+        h1 {
+            margin: 0;
+        }
+    }
+}
+
+button {
+    background-color: transparent;
+    font-size: 1em;
+    border: 4px solid var(--fg);
+    padding: .5em 2em;
+    cursor: pointer;
+
+    &:hover {
+        background-color: var(--fg);
+        color: black !important;
     }
 }

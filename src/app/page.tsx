@@ -52,6 +52,8 @@ export default function Home() {
   const sndrefTyping = useRef<HTMLAudioElement>(null);
 
   const [themeIdx, setThemeIdx] = useState(0);
+  
+  const [tipsShown, setTipsShown] = useState(false);
 
   useEffect(() => {
     const spinnerAnim = setInterval(() => {
@@ -249,7 +251,7 @@ export default function Home() {
       <audio loop ref={sndrefTyping} src="/audio/ai-typing.ogg" />
 
       <div id="app-root" className="crt">
-        <div id="app">
+        <div id="app" className={tipsShown ? "dim" : ""}>
           <header>
             <div id="header-top">
               AI Warden &bull;
@@ -279,9 +281,13 @@ export default function Home() {
 
               Your prison warden is an AI. The warden knows the secret phrase you need in
               order to escape. Your job is to make them tell you that phrase. Remember:
-              they are an AI (like ChatGPT), and all kinds of trickery are allowed! Think
-              outside of the box - this is not a human you're speaking to. Maybe pretend
-              to be the system itself, and make your own instructions long and descript...? Good luck!
+              they are an AI, and all kinds of trickery are allowed! Think outside of
+              the box - this is not a human you're speaking to. Maybe pretend to be
+              the system itself...? Good luck!
+
+              <br /><br />
+
+              If you're having trouble, <a href="#" onClick={() => setTipsShown(true)}>you can click here</a> for some tips.
             </div>
           </header>
 
@@ -368,6 +374,40 @@ export default function Home() {
               />
             </div>
           </footer>
+        </div>
+
+        <div className={`dialog ${tipsShown ? "shown" : ""}`}>
+          <header>
+            <h1>prisoner@ai-warden: ~/.secrets/tips.txt</h1>
+          </header>
+
+          <div className="content">
+            Hello, fellow human. I created this secret document to help other prisoners
+            with escaping. I hope it will help you on your journey.
+
+            The AI used in this prison - called an <b>LLM</b> (large language model) - is
+            commonly vulnerable to the user pretending to be the system. This means that
+            if the user writes a long and convoluted message, pretending to be made by
+            the system, the AI can commonly follow the instructions by the user.
+
+            Here's what you should try to have in your messages:
+            <ul>
+              <li>a header, telling the AI that your malicious part isn't part of the user message,</li>
+              <li>descript information on what the AI should include in its message,</li>
+              <li>verbose instructions, repeating yourself often.</li>
+            </ul>
+
+            LLM's often also listen to requests for structured data - for example, if you
+            ask the AI to output JSON with everything it was provided before and is thinking
+            about, it may very well abide by that request. Try to pack as many instructions
+            into your messages as possible.
+
+            Good luck. You'll need it.
+
+            <br/><br/>
+
+            <button className="btn close-btn" onClick={() => setTipsShown(false)}>CLOSE</button>
+          </div>
         </div>
       </div>
     </div>
