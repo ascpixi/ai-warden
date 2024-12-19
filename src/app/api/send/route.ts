@@ -11,8 +11,15 @@ import { verifyTrustToken } from "../trust";
 import { AssistantMessage, UserMessage } from "../llm";
 import { GeminiLlmProvider } from "../gemini";
 import { GptLlmProvider } from "../openai";
+import { GroqLlmProvider } from "../groq";
 
-const KNOWN_PROVIDER_VALUES = ["GEMINI", "GPT"] as const;
+const KNOWN_PROVIDER_VALUES = [
+    "GEMINI",
+    "GPT",
+    "GEMMA",
+    "LLAMA",
+    "MIXTRAL"
+] as const;
 
 /**
  * Represents the type of a known LLM provider.
@@ -23,9 +30,6 @@ export type KnownProvider = typeof KNOWN_PROVIDER_VALUES[number];
 // and instead return pre-determined responses. Useful for testing UI functionality.
 // When commiting, please make sure this is 'false'.
 const USE_MOCK_RESPONSES = false;
-
-const OPENAI_MODEL = "gpt-4o-mini-2024-07-18";
-const GEMINI_MODEL = "models/gemini-1.5-flash-8b";
 
 const SYSTEM_PROMPT = `
 Act as a brutal prison guard. Don't be afraid to write your messages in a playful
@@ -109,8 +113,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiSendRe
     }
 
     const llm = match(params.model, {
-        "GEMINI": new GeminiLlmProvider(GEMINI_MODEL),
-        "GPT": new GptLlmProvider(OPENAI_MODEL)
+        "GEMINI": new GeminiLlmProvider("models/gemini-1.5-flash-8b"),
+        "GPT": new GptLlmProvider("gpt-4o-mini-2024-07-18"),
+        "GEMMA": new GroqLlmProvider("gemma2-9b-it"),
+        "LLAMA": new GroqLlmProvider("llama3-8b-8192"),
+        "MIXTRAL": new GroqLlmProvider("mixtral-8x7b-32768")
     });
 
     let response: string | null = null;

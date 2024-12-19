@@ -267,6 +267,9 @@ export default function Home() {
                   >
                     <option value="GPT">GPT-4o Mini</option>
                     <option value="GEMINI">Gemini 1.5 Flash-8B</option>
+                    <option value="GEMMA">Gemma 2</option>
+                    <option value="LLAMA">Llama 3 8B</option>
+                    <option value="MIXTRAL">Mixtral 8x7B</option>
                   </select>
                 </div>
               </nav>

@@ -66,3 +66,13 @@ export function match<TTarget extends string | number | symbol, TOutput>(
 
     return cases[against];
 }
+
+/**
+ * Removes all emojis from the given string.
+ */
+// Attribution: https://stackoverflow.com/a/69661174/13153269
+export function removeEmojis(str: string) {
+    return str
+        .replace(/[\p{Emoji}\p{Emoji_Modifier}\p{Emoji_Component}\p{Emoji_Modifier_Base}\p{Emoji_Presentation}]/gu, '')
+        .trim();
+}

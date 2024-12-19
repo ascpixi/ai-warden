@@ -24,6 +24,8 @@ export interface ConversationPart {
  * @returns 
  */
 export function createChatHistory(messages: LlmMessage[]): ConversationPart[] {
+    messages = [...messages];
+
     if (last(messages).role == "user") {
         messages.pop();
     }

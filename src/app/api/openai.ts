@@ -1,4 +1,4 @@
-import { last } from "../util";
+import { last, removeEmojis } from "../util";
 import { createChatHistory, LlmMessage, LlmProvider } from "./llm";
 
 const LLM_API_URL = "https://jamsapi.hackclub.dev/openai/chat/completions";
@@ -82,11 +82,7 @@ export class GptLlmProvider implements LlmProvider {
                 return null;
             }
     
-            // Remove all emojis from the response (https://stackoverflow.com/a/69661174/13153269)
-            response = response
-                .replace(/[\p{Emoji}\p{Emoji_Modifier}\p{Emoji_Component}\p{Emoji_Modifier_Base}\p{Emoji_Presentation}]/gu, '')
-                .trim();
-    
+            response = removeEmojis(response);
             break;
         }
 
